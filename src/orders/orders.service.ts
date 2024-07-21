@@ -46,9 +46,6 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
         return acc + orderItem.quantity;
       }, 0);
 
-      console.log(productsId);
-      console.log(products);
-      console.log(createOrderDto);
       // Create a transaction database
       const order = await this.order.create({
         data: {
