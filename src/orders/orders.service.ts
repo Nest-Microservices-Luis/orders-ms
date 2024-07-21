@@ -29,13 +29,62 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
 
   async create(createOrderDto: CreateOrderDto) {
     try {
+      // Validate that exist products
       const productsId = createOrderDto.items.map((x) => x.productId);
-      const validateProducts = await firstValueFrom(
+      const products: any[] = await firstValueFrom(
         this.productsClient.send({ cmd: 'validate_products' }, productsId),
       );
 
-      return validateProducts;
+      // Calculate values
+      const totalAmount = createOrderDto.items.reduce((acc, orderItem) => {
+        const price = products.find(
+          (product) => product.id === orderItem.productId,
+        ).price;
+
+        return price * orderItem.quantity;
+      }, 0);
+
+      const totalItems = createOrderDto.items.reduce((acc, orderItem) => {
+        return acc + orderItem.quantity;
+      }, 0);
+
+      console.log(productsId);
+      console.log(products);
+      console.log(createOrderDto);
+      // Create a transaction database
+      const order = await this.order.create({
+        data: {
+          totalAmount,
+          totalItems,
+          OrderItem: {
+            createMany: {
+              data: createOrderDto.items.map((orderItem) => ({
+                price: products.find(
+                  (product) => product.id === orderItem.productId,
+                ).price,
+                productId: orderItem.productId,
+                quantity: orderItem.quantity,
+              })),
+            },
+          },
+        },
+        include: {
+          OrderItem: {
+            select: { price: true, quantity: true, productId: true },
+          },
+        },
+      });
+
+      return {
+        ...order,
+        OrderItem: order.OrderItem.map((orderItem) => ({
+          ...orderItem,
+          name: products.find((product) => product.id === orderItem.productId)
+            .name,
+        })),
+      };
     } catch (error) {
+      console.log(error);
       throw new RpcException({
         message: 'Check logs',
         status: HttpStatus.BAD_REQUEST,
@@ -67,7 +116,14 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
   }
 
   async findOne(id: string) {
-    const order = await this.order.findFirst({ where: { id } });
+    const order = await this.order.findFirst({
+      where: { id },
+      include: {
+        OrderItem: {
+          select: { price: true, quantity: true, productId: true },
+        },
+      },
+    });
 
     if (!order) {
       throw new RpcException({
@@ -76,7 +132,19 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
       });
     }
 
-    return order;
+    const productsId = order.OrderItem.map((orderItem) => orderItem.productId);
+    const products: any[] = await firstValueFrom(
+      this.productsClient.send({ cmd: 'validate_products' }, productsId),
+    );
+
+    return {
+      ...order,
+      OrderItem: order.OrderItem.map((orderItem) => ({
+        ...orderItem,
+        name: products.find((product) => product.id === orderItem.productId)
+          .name,
+      })),
+    };
   }
 
   async changeStatus(updateStatusOrderDto: UpdateStatusOrderDto) {
