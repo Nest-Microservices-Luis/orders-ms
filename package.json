@@ -11,7 +11,7 @@
     "start": "nest start",
     "start:dev": "npm run docker:start && nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main",
     "docker:start": "prisma migrate dev && prisma generate",
     "lint": "echo Lint desactivado",
     "test": "jest",
