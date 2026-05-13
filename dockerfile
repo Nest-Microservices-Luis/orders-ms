@@ -10,3 +10,5 @@ RUN npm install
 COPY . .
 
 EXPOSE 3003
+
+# Crear imagen de Docker
